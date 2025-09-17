@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Gallery</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+        }
+        #gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .image-container {
+            position: relative;
+            overflow: hidden;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: white;
+        }
+        .image-container img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        #pagination {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background-color: white;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        #pagination button {
+            margin: 0 5px;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+        #pagination button:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+        #loading {
+            text-align: center;
+            font-size: 18px;
+            margin: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="pagination">
+        <button id="prev">Previous</button>
+        <span id="page-info">Page 1</span>
+        <button id="next">Next</button>
+    </div>
+    <div id="gallery"></div>
+    <div id="loading">Loading images...</div>
+
+    <script>
+        const repoOwner = 'NingyMD';
+        const repoName = 'camerapture';
+        const apiUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/contents`;
+        const rawBaseUrl = `https://raw.githubusercontent.com/${repoOwner}/${repoName}/main/`;
+        const blobBaseUrl = `https://github.com/${repoOwner}/${repoName}/blob/main/`;
+
+        let images = [];
+        let currentPage = 1;
+        const imagesPerPage = 100; // 20 rows x 5 images
+
+        const gallery = document.getElementById('gallery');
+        const loading = document.getElementById('loading');
+        const prevButton = document.getElementById('prev');
+        const nextButton = document.getElementById('next');
+        const pageInfo = document.getElementById('page-info');
+
+        async function fetchImages() {
+            try {
+                const response = await fetch(apiUrl);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch repository contents');
+                }
+                const data = await response.json();
+                images = data
+                    .filter(item => item.type === 'file' && item.name.endsWith('.webp'))
+                    .map(item => ({
+                        name: item.name,
+                        src: rawBaseUrl + item.name,
+                        link: blobBaseUrl + item.name
+                    }));
+                loading.style.display = 'none';
+                renderPage();
+                updatePagination();
+            } catch (error) {
+                loading.textContent = 'Error loading images: ' + error.message;
+            }
+        }
+
+        function renderPage() {
+            gallery.innerHTML = '';
+            const start = (currentPage - 1) * imagesPerPage;
+            const end = start + imagesPerPage;
+            const pageImages = images.slice(start, end);
+
+            // Adjust grid columns to max 5 per row
+            gallery.style.gridTemplateColumns = 'repeat(5, 1fr)';
+
+            pageImages.forEach(image => {
+                const container = document.createElement('div');
+                container.className = 'image-container';
+
+                const img = document.createElement('img');
+                img.src = image.src;
+                img.alt = image.name;
+                img.loading = 'lazy'; // To help with performance
+
+                const link = document.createElement('a');
+                link.href = image.link;
+                link.target = '_blank';
+                link.appendChild(img);
+
+                container.appendChild(link);
+                gallery.appendChild(container);
+            });
+        }
+
+        function updatePagination() {
+            pageInfo.textContent = `Page ${currentPage} of ${Math.ceil(images.length / imagesPerPage)}`;
+            prevButton.disabled = currentPage === 1;
+            nextButton.disabled = currentPage === Math.ceil(images.length / imagesPerPage);
+        }
+
+        prevButton.addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                renderPage();
+                updatePagination();
+            }
+        });
+
+        nextButton.addEventListener('click', () => {
+            if (currentPage < Math.ceil(images.length / imagesPerPage)) {
+                currentPage++;
+                renderPage();
+                updatePagination();
+            }
+        });
+
+        fetchImages();
+    </script>
+</body>
+</html>
